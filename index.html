@@ -87,16 +87,26 @@
       .submit-button:hover {
           background-color: #1e7e34;
       }
+
+      .order-list {
+          margin-top: 20px;
+          font-size: 14px;
+          color: #333;
+      }
+
+      .order-list div {
+          padding: 6px 0;
+      }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.03)</h1>
+  <h1>Pick Sheet Generator (vers 0.09)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
-    <button>Export Pick Sheets</button>
+    <button id="exportBtn">Export Pick Sheets</button>
     <button id="resetBtn">Reset</button>
   </div>
 
@@ -118,13 +128,20 @@
 
     <button class="submit-button" id="submitOrderBtn">Submit Order</button>
   </div>
+
+  <div class="order-list" id="orderList"></div>
 </div>
 
 <script>
   const addOrderBtn = document.getElementById('addOrderBtn');
   const submitOrderBtn = document.getElementById('submitOrderBtn');
   const resetBtn = document.getElementById('resetBtn');
+  const exportBtn = document.getElementById('exportBtn');
   const orderForm = document.getElementById('orderForm');
+  const orderList = document.getElementById('orderList');
+
+  let exportRows = [];
+  let headerAdded = false;
 
   addOrderBtn.onclick = () => {
     orderForm.style.display = 'block';
@@ -135,6 +152,9 @@
     document.getElementById('orderColor').value = '';
     document.getElementById('textEntry').value = '';
     orderForm.style.display = 'none';
+    orderList.innerHTML = '';
+    exportRows = [];
+    headerAdded = false;
   };
 
   submitOrderBtn.onclick = () => {
@@ -146,18 +166,18 @@
     let lastQuantity = '';
 
     const lines = text.split(/\r?\n/);
-    let output = [];
 
-    // Header row
-    output.push(
-      "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date"
-    );
+    if (!headerAdded) {
+      exportRows.push(
+        "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date"
+      );
+      headerAdded = true;
+    }
 
     lines.forEach(line => {
       const parts = line.trim().split(/\s+/);
       let index = 0;
 
-      // Product Code & Quantity (if present)
       if (/^\d{5}$/.test(parts[index])) {
         lastProductCode = parts[index++];
         lastQuantity = parts[index++];
@@ -170,7 +190,7 @@
       const location = parts[index++];
       const packedDate = parts[index];
 
-      output.push([
+      exportRows.push([
         orderNumber,
         orderColor,
         lastProductCode,
@@ -182,10 +202,26 @@
       ].join('\t'));
     });
 
-    navigator.clipboard.writeText(output.join('\n'));
-    alert("Pick sheet copied to clipboard and ready for Excel.");
+    // Show confirmation text
+    const confirmation = document.createElement('div');
+    confirmation.textContent = `${orderNumber} - ${orderColor} added.`;
+    orderList.appendChild(confirmation);
 
-    resetBtn.onclick();
+    // Clear & collapse form
+    document.getElementById('orderNumber').value = '';
+    document.getElementById('orderColor').value = '';
+    document.getElementById('textEntry').value = '';
+    orderForm.style.display = 'none';
+  };
+
+  exportBtn.onclick = () => {
+    if (exportRows.length === 0) {
+      alert("No orders to export.");
+      return;
+    }
+
+    navigator.clipboard.writeText(exportRows.join('\n'));
+    alert("Pick sheets copied to clipboard and ready for Excel.");
   };
 </script>
 
