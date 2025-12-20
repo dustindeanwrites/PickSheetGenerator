@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pick Sheet Generator (ver 0.02)</title>
+  <title>Pick Sheet Generator</title>
   <style>
       body {
           font-family: Arial, sans-serif;
@@ -92,7 +92,7 @@
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator</h1>
+  <h1>Pick Sheet Generator (vers 0.03)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -148,53 +148,43 @@
     const lines = text.split(/\r?\n/);
     let output = [];
 
-    output.push(orderNumber);
+    // Header row
     output.push(
-      "Order Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date"
+      "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date"
     );
 
     lines.forEach(line => {
       const parts = line.trim().split(/\s+/);
       let index = 0;
 
-      // Detect Product Code (5 digits)
+      // Product Code & Quantity (if present)
       if (/^\d{5}$/.test(parts[index])) {
         lastProductCode = parts[index++];
         lastQuantity = parts[index++];
       }
 
-      // Boxes on Pallet (number before IPN)
       const boxes = parts[index++];
-
-      // Pallet ID
       const palletId = parts[index] + parts[index + 1];
       index += 2;
 
-      // Location
       const location = parts[index++];
-
-      // Packed Date
       const packedDate = parts[index];
 
-      output.push(
-        [
-          orderColor,
-          lastProductCode,
-          lastQuantity,
-          palletId,
-          boxes,
-          location,
-          packedDate
-        ].join('\t')
-      );
+      output.push([
+        orderNumber,
+        orderColor,
+        lastProductCode,
+        lastQuantity,
+        palletId,
+        boxes,
+        location,
+        packedDate
+      ].join('\t'));
     });
 
-    const finalText = output.join('\n');
-    navigator.clipboard.writeText(finalText);
-
+    navigator.clipboard.writeText(output.join('\n'));
     alert("Pick sheet copied to clipboard and ready for Excel.");
 
-    // Reset & collapse
     resetBtn.onclick();
   };
 </script>
