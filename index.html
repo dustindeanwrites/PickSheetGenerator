@@ -12,7 +12,7 @@
       }
 
       .container {
-          max-width: 700px;
+          max-width: 800px;
           margin: 40px auto;
           background: #ffffff;
           padding: 30px;
@@ -75,7 +75,7 @@
       }
 
       textarea {
-          height: 120px;
+          height: 180px;
           resize: vertical;
       }
 
@@ -96,23 +96,23 @@
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
-    <button>Finalize Pick Sheets</button>
+    <button>Export Pick Sheets</button>
     <button id="resetBtn">Reset</button>
   </div>
 
   <div class="order-form" id="orderForm">
     <div class="form-group">
-      <label for="orderNumber">Order Number</label>
+      <label>Order Number</label>
       <input type="text" id="orderNumber">
     </div>
 
     <div class="form-group">
-      <label for="orderColor">Order Color</label>
+      <label>Order Color</label>
       <input type="text" id="orderColor">
     </div>
 
     <div class="form-group">
-      <label for="textEntry">Text Entry</label>
+      <label>Text Entry</label>
       <textarea id="textEntry"></textarea>
     </div>
 
@@ -126,30 +126,77 @@
   const resetBtn = document.getElementById('resetBtn');
   const orderForm = document.getElementById('orderForm');
 
-  const orderNumber = document.getElementById('orderNumber');
-  const orderColor = document.getElementById('orderColor');
-  const textEntry = document.getElementById('textEntry');
-
-  addOrderBtn.addEventListener('click', () => {
+  addOrderBtn.onclick = () => {
     orderForm.style.display = 'block';
-  });
+  };
 
-  submitOrderBtn.addEventListener('click', () => {
-    // Clear fields
-    orderNumber.value = '';
-    orderColor.value = '';
-    textEntry.value = '';
-
-    // Collapse form
+  resetBtn.onclick = () => {
+    document.getElementById('orderNumber').value = '';
+    document.getElementById('orderColor').value = '';
+    document.getElementById('textEntry').value = '';
     orderForm.style.display = 'none';
-  });
+  };
 
-  resetBtn.addEventListener('click', () => {
-    orderNumber.value = '';
-    orderColor.value = '';
-    textEntry.value = '';
-    orderForm.style.display = 'none';
-  });
+  submitOrderBtn.onclick = () => {
+    const orderNumber = document.getElementById('orderNumber').value.trim();
+    const orderColor = document.getElementById('orderColor').value.trim();
+    const text = document.getElementById('textEntry').value.trim();
+
+    let lastProductCode = '';
+    let lastQuantity = '';
+
+    const lines = text.split(/\r?\n/);
+    let output = [];
+
+    output.push(orderNumber);
+    output.push(
+      "Order Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date"
+    );
+
+    lines.forEach(line => {
+      const parts = line.trim().split(/\s+/);
+      let index = 0;
+
+      // Detect Product Code (5 digits)
+      if (/^\d{5}$/.test(parts[index])) {
+        lastProductCode = parts[index++];
+        lastQuantity = parts[index++];
+      }
+
+      // Boxes on Pallet (number before IPN)
+      const boxes = parts[index++];
+
+      // Pallet ID
+      const palletId = parts[index] + parts[index + 1];
+      index += 2;
+
+      // Location
+      const location = parts[index++];
+
+      // Packed Date
+      const packedDate = parts[index];
+
+      output.push(
+        [
+          orderColor,
+          lastProductCode,
+          lastQuantity,
+          palletId,
+          boxes,
+          location,
+          packedDate
+        ].join('\t')
+      );
+    });
+
+    const finalText = output.join('\n');
+    navigator.clipboard.writeText(finalText);
+
+    alert("Pick sheet copied to clipboard and ready for Excel.");
+
+    // Reset & collapse
+    resetBtn.onclick();
+  };
 </script>
 
 </body>
