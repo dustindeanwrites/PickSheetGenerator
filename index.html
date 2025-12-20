@@ -102,7 +102,7 @@
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.09)</h1>
+  <h1>Pick Sheet Generator (vers 0.14)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -140,7 +140,8 @@
   const orderForm = document.getElementById('orderForm');
   const orderList = document.getElementById('orderList');
 
-  let exportRows = [];
+  let mainItems = [];
+  let rejectedItems = [];
   let headerAdded = false;
 
   addOrderBtn.onclick = () => {
@@ -153,9 +154,24 @@
     document.getElementById('textEntry').value = '';
     orderForm.style.display = 'none';
     orderList.innerHTML = '';
-    exportRows = [];
+    mainItems = [];
+    rejectedItems = [];
     headerAdded = false;
   };
+
+  function daysOld(dateString) {
+    const [mm, dd, yyyy] = dateString.split('/').map(Number);
+    const packedDate = new Date(yyyy, mm - 1, dd);
+    return (new Date() - packedDate) / (1000 * 60 * 60 * 24);
+  }
+
+  function formatLocation(raw) {
+    if (raw === "60001000") return "NONE";
+    if (/^\d{8}$/.test(raw)) {
+      return `${raw.slice(0,2)}-${raw.slice(2,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`;
+    }
+    return raw;
+  }
 
   submitOrderBtn.onclick = () => {
     const orderNumber = document.getElementById('orderNumber').value.trim();
@@ -166,13 +182,8 @@
     let lastQuantity = '';
 
     const lines = text.split(/\r?\n/);
-
-    if (!headerAdded) {
-      exportRows.push(
-        "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date"
-      );
-      headerAdded = true;
-    }
+    const isEDI = orderNumber.startsWith('EDI');
+    const maxAge = isEDI ? 7 : 30;
 
     lines.forEach(line => {
       const parts = line.trim().split(/\s+/);
@@ -184,30 +195,43 @@
       }
 
       const boxes = parts[index++];
-      const palletId = parts[index] + parts[index + 1];
+      const palletId = parts[index] + " " + parts[index + 1];
       index += 2;
 
-      const location = parts[index++];
+      const rawLocation = parts[index++];
+      const formattedLocation = formatLocation(rawLocation);
       const packedDate = parts[index];
 
-      exportRows.push([
+      const age = daysOld(packedDate);
+      const is71Location = /^\d{8}$/.test(rawLocation) && rawLocation.startsWith('71');
+
+      const item = {
         orderNumber,
         orderColor,
-        lastProductCode,
-        lastQuantity,
+        productCode: lastProductCode,
+        quantity: lastQuantity,
         palletId,
         boxes,
-        location,
+        location: formattedLocation,
+        rawLocation,
         packedDate
-      ].join('\t'));
+      };
+
+      if (!is71Location && age > maxAge) {
+        rejectedItems.push({
+          ...item,
+          orderNumber: "REJECTED",
+          orderColor: isEDI ? "OLD - EDI" : "OLD"
+        });
+      } else {
+        mainItems.push(item);
+      }
     });
 
-    // Show confirmation text
     const confirmation = document.createElement('div');
     confirmation.textContent = `${orderNumber} - ${orderColor} added.`;
     orderList.appendChild(confirmation);
 
-    // Clear & collapse form
     document.getElementById('orderNumber').value = '';
     document.getElementById('orderColor').value = '';
     document.getElementById('textEntry').value = '';
@@ -215,15 +239,60 @@
   };
 
   exportBtn.onclick = () => {
-    if (exportRows.length === 0) {
+    if (mainItems.length === 0 && rejectedItems.length === 0) {
       alert("No orders to export.");
       return;
     }
 
-    navigator.clipboard.writeText(exportRows.join('\n'));
+    const header =
+      "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date";
+
+    // Sort MAIN section only
+    mainItems.sort((a, b) => {
+      const aNum = /^\d{8}$/.test(a.rawLocation);
+      const bNum = /^\d{8}$/.test(b.rawLocation);
+
+      if (aNum && bNum) return a.rawLocation.localeCompare(b.rawLocation);
+      if (aNum) return -1;
+      if (bNum) return 1;
+      return a.location.localeCompare(b.location);
+    });
+
+    const rows = [header];
+
+    mainItems.forEach(i => {
+      rows.push([
+        i.orderNumber,
+        i.orderColor,
+        i.productCode,
+        i.quantity,
+        i.palletId,
+        i.boxes,
+        i.location,
+        i.packedDate
+      ].join('\t'));
+    });
+
+    rejectedItems.forEach(i => {
+      rows.push([
+        i.orderNumber,
+        i.orderColor,
+        i.productCode,
+        i.quantity,
+        i.palletId,
+        i.boxes,
+        i.location,
+        i.packedDate
+      ].join('\t'));
+    });
+
+    navigator.clipboard.writeText(rows.join('\n'));
     alert("Pick sheets copied to clipboard and ready for Excel.");
   };
 </script>
+
+
+
 
 </body>
 </html>
