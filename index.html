@@ -102,7 +102,7 @@
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.14)</h1>
+  <h1>Pick Sheet Generator (vers 0.16)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -141,8 +141,9 @@
   const orderList = document.getElementById('orderList');
 
   let mainItems = [];
+  let extraItems = [];
   let rejectedItems = [];
-  let headerAdded = false;
+  let usedPalletIds = new Set();
 
   addOrderBtn.onclick = () => {
     orderForm.style.display = 'block';
@@ -155,14 +156,14 @@
     orderForm.style.display = 'none';
     orderList.innerHTML = '';
     mainItems = [];
+    extraItems = [];
     rejectedItems = [];
-    headerAdded = false;
+    usedPalletIds.clear();
   };
 
   function daysOld(dateString) {
     const [mm, dd, yyyy] = dateString.split('/').map(Number);
-    const packedDate = new Date(yyyy, mm - 1, dd);
-    return (new Date() - packedDate) / (1000 * 60 * 60 * 24);
+    return (new Date() - new Date(yyyy, mm - 1, dd)) / 86400000;
   }
 
   function formatLocation(raw) {
@@ -179,52 +180,88 @@
     const text = document.getElementById('textEntry').value.trim();
 
     let lastProductCode = '';
-    let lastQuantity = '';
+    let lastQuantity = 0;
 
-    const lines = text.split(/\r?\n/);
     const isEDI = orderNumber.startsWith('EDI');
     const maxAge = isEDI ? 7 : 30;
 
-    lines.forEach(line => {
-      const parts = line.trim().split(/\s+/);
-      let index = 0;
+    const parsed = [];
 
-      if (/^\d{5}$/.test(parts[index])) {
-        lastProductCode = parts[index++];
-        lastQuantity = parts[index++];
+    text.split(/\r?\n/).forEach(line => {
+      const p = line.trim().split(/\s+/);
+      let i = 0;
+
+      if (/^\d{5}$/.test(p[i])) {
+        lastProductCode = p[i++];
+        lastQuantity = Number(p[i++]);
       }
 
-      const boxes = parts[index++];
-      const palletId = parts[index] + " " + parts[index + 1];
-      index += 2;
+      const boxes = Number(p[i++]);
+      const palletId = p[i] + " " + p[i + 1];
+      i += 2;
 
-      const rawLocation = parts[index++];
-      const formattedLocation = formatLocation(rawLocation);
-      const packedDate = parts[index];
+      // 🚫 Skip pallet if already used
+      if (usedPalletIds.has(palletId)) return;
+      usedPalletIds.add(palletId);
+
+      const rawLocation = p[i++];
+      const packedDate = p[i];
 
       const age = daysOld(packedDate);
-      const is71Location = /^\d{8}$/.test(rawLocation) && rawLocation.startsWith('71');
+      const is71 = /^\d{8}$/.test(rawLocation) && rawLocation.startsWith('71');
 
       const item = {
         orderNumber,
         orderColor,
         productCode: lastProductCode,
-        quantity: lastQuantity,
-        palletId,
+        quantityNeeded: lastQuantity,
         boxes,
-        location: formattedLocation,
+        palletId,
         rawLocation,
+        location: formatLocation(rawLocation),
         packedDate
       };
 
-      if (!is71Location && age > maxAge) {
+      if (!is71 && age > maxAge) {
         rejectedItems.push({
           ...item,
           orderNumber: "REJECTED",
           orderColor: isEDI ? "OLD - EDI" : "OLD"
         });
       } else {
-        mainItems.push(item);
+        parsed.push(item);
+      }
+    });
+
+    // Group by Product Code
+    const byProduct = {};
+    parsed.forEach(i => {
+      if (!byProduct[i.productCode]) byProduct[i.productCode] = [];
+      byProduct[i.productCode].push(i);
+    });
+
+    Object.values(byProduct).forEach(group => {
+      group.sort((a, b) => new Date(a.packedDate) - new Date(b.packedDate));
+
+      let remaining = group[0].quantityNeeded;
+
+      for (let row of group) {
+        if (remaining <= 0) {
+          extraItems.push(row);
+          continue;
+        }
+
+        if (row.boxes < remaining) {
+          remaining -= row.boxes;
+          mainItems.push(row);
+        } else if (row.boxes === remaining) {
+          mainItems.push(row);
+          remaining = 0;
+        } else {
+          row.boxes = `${row.boxes} need ${remaining}`;
+          mainItems.push(row);
+          remaining = 0;
+        }
       }
     });
 
@@ -239,20 +276,14 @@
   };
 
   exportBtn.onclick = () => {
-    if (mainItems.length === 0 && rejectedItems.length === 0) {
-      alert("No orders to export.");
-      return;
-    }
-
     const header =
       "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date";
 
-    // Sort MAIN section only
+    // Sort MAIN by location
     mainItems.sort((a, b) => {
-      const aNum = /^\d{8}$/.test(a.rawLocation);
-      const bNum = /^\d{8}$/.test(b.rawLocation);
-
-      if (aNum && bNum) return a.rawLocation.localeCompare(b.rawLocation);
+      const aNum = /^\d/.test(a.location);
+      const bNum = /^\d/.test(b.location);
+      if (aNum && bNum) return a.location.localeCompare(b.location);
       if (aNum) return -1;
       if (bNum) return 1;
       return a.location.localeCompare(b.location);
@@ -260,31 +291,20 @@
 
     const rows = [header];
 
-    mainItems.forEach(i => {
-      rows.push([
-        i.orderNumber,
-        i.orderColor,
-        i.productCode,
-        i.quantity,
-        i.palletId,
-        i.boxes,
-        i.location,
-        i.packedDate
-      ].join('\t'));
-    });
+    mainItems.forEach(i => rows.push([
+      i.orderNumber, i.orderColor, i.productCode, i.quantityNeeded,
+      i.palletId, i.boxes, i.location, i.packedDate
+    ].join('\t')));
 
-    rejectedItems.forEach(i => {
-      rows.push([
-        i.orderNumber,
-        i.orderColor,
-        i.productCode,
-        i.quantity,
-        i.palletId,
-        i.boxes,
-        i.location,
-        i.packedDate
-      ].join('\t'));
-    });
+    extraItems.forEach(i => rows.push([
+      "EXTRA", i.orderColor, i.productCode, i.quantityNeeded,
+      i.palletId, i.boxes, i.location, i.packedDate
+    ].join('\t')));
+
+    rejectedItems.forEach(i => rows.push([
+      i.orderNumber, i.orderColor, i.productCode, i.quantityNeeded,
+      i.palletId, i.boxes, i.location, i.packedDate
+    ].join('\t')));
 
     navigator.clipboard.writeText(rows.join('\n'));
     alert("Pick sheets copied to clipboard and ready for Excel.");
