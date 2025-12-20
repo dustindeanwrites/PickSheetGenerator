@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pick Sheet Generator</title>
+  <style>
+      body {
+          font-family: Arial, sans-serif;
+          background-color: #f5f6f8;
+          margin: 0;
+          padding: 0;
+      }
+
+      .container {
+          max-width: 700px;
+          margin: 40px auto;
+          background: #ffffff;
+          padding: 30px;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      }
+
+      h1 {
+          text-align: center;
+          margin-bottom: 30px;
+          color: #333;
+      }
+
+      .button-row {
+          display: flex;
+          justify-content: center;
+          gap: 15px;
+          margin-bottom: 25px;
+      }
+
+      button {
+          padding: 10px 18px;
+          border: none;
+          border-radius: 5px;
+          background-color: #007bff;
+          color: #fff;
+          font-size: 14px;
+          cursor: pointer;
+      }
+
+      button:hover {
+          background-color: #0056b3;
+      }
+
+      .order-form {
+          display: none;
+          margin-top: 20px;
+          border-top: 1px solid #ddd;
+          padding-top: 20px;
+      }
+
+      .form-group {
+          margin-bottom: 15px;
+      }
+
+      label {
+          display: block;
+          font-weight: bold;
+          margin-bottom: 5px;
+          color: #444;
+      }
+
+      input[type="text"],
+      textarea {
+          width: 100%;
+          padding: 8px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 14px;
+      }
+
+      textarea {
+          height: 120px;
+          resize: vertical;
+      }
+
+      .submit-button {
+          margin-top: 10px;
+          background-color: #28a745;
+      }
+
+      .submit-button:hover {
+          background-color: #1e7e34;
+      }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Pick Sheet Generator</h1>
+
+  <div class="button-row">
+    <button id="addOrderBtn">Add Order</button>
+    <button>Finalize Pick Sheets</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+
+  <div class="order-form" id="orderForm">
+    <div class="form-group">
+      <label for="orderNumber">Order Number</label>
+      <input type="text" id="orderNumber">
+    </div>
+
+    <div class="form-group">
+      <label for="orderColor">Order Color</label>
+      <input type="text" id="orderColor">
+    </div>
+
+    <div class="form-group">
+      <label for="textEntry">Text Entry</label>
+      <textarea id="textEntry"></textarea>
+    </div>
+
+    <button class="submit-button" id="submitOrderBtn">Submit Order</button>
+  </div>
+</div>
+
+<script>
+  const addOrderBtn = document.getElementById('addOrderBtn');
+  const submitOrderBtn = document.getElementById('submitOrderBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const orderForm = document.getElementById('orderForm');
+
+  const orderNumber = document.getElementById('orderNumber');
+  const orderColor = document.getElementById('orderColor');
+  const textEntry = document.getElementById('textEntry');
+
+  addOrderBtn.addEventListener('click', () => {
+    orderForm.style.display = 'block';
+  });
+
+  submitOrderBtn.addEventListener('click', () => {
+    // Clear fields
+    orderNumber.value = '';
+    orderColor.value = '';
+    textEntry.value = '';
+
+    // Collapse form
+    orderForm.style.display = 'none';
+  });
+
+  resetBtn.addEventListener('click', () => {
+    orderNumber.value = '';
+    orderColor.value = '';
+    textEntry.value = '';
+    orderForm.style.display = 'none';
+  });
+</script>
+
+</body>
+</html>
