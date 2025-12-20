@@ -102,7 +102,7 @@
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.16)</h1>
+  <h1>Pick Sheet Generator (vers 0.21)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -143,6 +143,7 @@
   let mainItems = [];
   let extraItems = [];
   let rejectedItems = [];
+  let spareItems = [];
   let usedPalletIds = new Set();
 
   addOrderBtn.onclick = () => {
@@ -158,6 +159,7 @@
     mainItems = [];
     extraItems = [];
     rejectedItems = [];
+    spareItems = [];
     usedPalletIds.clear();
   };
 
@@ -200,7 +202,7 @@
       const palletId = p[i] + " " + p[i + 1];
       i += 2;
 
-      // 🚫 Skip pallet if already used
+      // Skip pallet if already used
       if (usedPalletIds.has(palletId)) return;
       usedPalletIds.add(palletId);
 
@@ -258,8 +260,19 @@
           mainItems.push(row);
           remaining = 0;
         } else {
-          row.boxes = `${row.boxes} need ${remaining}`;
+          // Partial use, save remaining for SPARE
+          const used = remaining;
+          const leftover = row.boxes - used;
+          row.boxes = `${row.boxes} need ${used}`;
           mainItems.push(row);
+
+          // Save leftover quantity for SPARE
+          const spareRow = { ...row };
+          spareRow.boxes = leftover;
+          spareRow.orderColor = "UNUSED";
+          spareRow.quantityNeeded = ""; // leave blank for SPARE
+          spareItems.push(spareRow);
+
           remaining = 0;
         }
       }
@@ -291,18 +304,27 @@
 
     const rows = [header];
 
+    // MAIN
     mainItems.forEach(i => rows.push([
       i.orderNumber, i.orderColor, i.productCode, i.quantityNeeded,
       i.palletId, i.boxes, i.location, i.packedDate
     ].join('\t')));
 
-    extraItems.forEach(i => rows.push([
-      "EXTRA", i.orderColor, i.productCode, i.quantityNeeded,
+    // Add blank row between MAIN and REJECTED
+    if (rejectedItems.length > 0) rows.push('');
+
+    // REJECTED
+    rejectedItems.forEach(i => rows.push([
+      i.orderNumber, i.orderColor, i.productCode, i.quantityNeeded,
       i.palletId, i.boxes, i.location, i.packedDate
     ].join('\t')));
 
-    rejectedItems.forEach(i => rows.push([
-      i.orderNumber, i.orderColor, i.productCode, i.quantityNeeded,
+    // Add blank row between REJECTED and SPARE
+    if (spareItems.length > 0) rows.push('');
+
+    // SPARE (Boxes as numeric, Order Color = UNUSED, Quantity Needed blank)
+    spareItems.forEach(i => rows.push([
+      "SPARE", i.orderColor, i.productCode, i.quantityNeeded,
       i.palletId, i.boxes, i.location, i.packedDate
     ].join('\t')));
 
@@ -310,6 +332,9 @@
     alert("Pick sheets copied to clipboard and ready for Excel.");
   };
 </script>
+
+
+
 
 
 
