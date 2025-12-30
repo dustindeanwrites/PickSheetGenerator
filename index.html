@@ -4,105 +4,91 @@
   <meta charset="UTF-8">
   <title>Pick Sheet Generator</title>
   <style>
-      body {
-          font-family: Arial, sans-serif;
-          background-color: #f5f6f8;
-          margin: 0;
-          padding: 0;
-      }
-
-      .container {
-          max-width: 800px;
-          margin: 40px auto;
-          background: #ffffff;
-          padding: 30px;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-      }
-
-      h1 {
-          text-align: center;
-          margin-bottom: 30px;
-          color: #333;
-      }
-
-      .button-row {
-          display: flex;
-          justify-content: center;
-          gap: 15px;
-          margin-bottom: 25px;
-      }
-
-      button {
-          padding: 10px 18px;
-          border: none;
-          border-radius: 5px;
-          background-color: #007bff;
-          color: #fff;
-          font-size: 14px;
-          cursor: pointer;
-      }
-
-      button:hover {
-          background-color: #0056b3;
-      }
-
-      .order-form {
-          display: none;
-          margin-top: 20px;
-          border-top: 1px solid #ddd;
-          padding-top: 20px;
-      }
-
-      .form-group {
-          margin-bottom: 15px;
-      }
-
-      label {
-          display: block;
-          font-weight: bold;
-          margin-bottom: 5px;
-          color: #444;
-      }
-
-      input[type="text"],
-      textarea {
-          width: 100%;
-          padding: 8px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          font-size: 14px;
-      }
-
-      textarea {
-          height: 180px;
-          resize: vertical;
-      }
-
-      .submit-button {
-          margin-top: 10px;
-          background-color: #28a745;
-      }
-
-      .submit-button:hover {
-          background-color: #1e7e34;
-      }
-
-      .order-list {
-          margin-top: 20px;
-          font-size: 14px;
-          color: #333;
-      }
-
-      .order-list div {
-          padding: 6px 0;
-      }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f6f8;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+    .button-row {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .order-form {
+      display: none;
+      margin-top: 20px;
+      border-top: 1px solid #ddd;
+      padding-top: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #444;
+    }
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    textarea {
+      height: 180px;
+      resize: vertical;
+    }
+    .submit-button {
+      margin-top: 10px;
+      background-color: #28a745;
+    }
+    .submit-button:hover {
+      background-color: #1e7e34;
+    }
+    .order-list {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #333;
+    }
+    .order-list div {
+      padding: 6px 0;
+    }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.30)</h1>
+  <h1>Pick Sheet Generator (vers 0.33)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -140,16 +126,13 @@
   const orderForm = document.getElementById('orderForm');
   const orderList = document.getElementById('orderList');
 
-  /* ✅ FIX: properly bind inputs */
   const orderNumberInput = document.getElementById('orderNumber');
   const orderColorInput = document.getElementById('orderColor');
   const textEntry = document.getElementById('textEntry');
 
   let orders = {};
 
-  addOrderBtn.onclick = () => {
-    orderForm.style.display = 'block';
-  };
+  addOrderBtn.onclick = () => orderForm.style.display = 'block';
 
   resetBtn.onclick = () => {
     orderForm.style.display = 'none';
@@ -170,42 +153,78 @@
     return raw;
   }
 
-  /* 🔧 BULLETPROOF NORMALIZATION */
-  function normalizeInput(rawText) {
-    const tokens = rawText.replace(/\s+/g, ' ').trim().split(' ');
-    const rows = [];
-    let buffer = [];
+  // 🔢 location sorter: numeric by each segment
+  function compareLocations(a, b) {
+    function normalize(loc) {
+      if (loc === "NONE") return [999, 999, 999, 999];
 
-    for (let i = 0; i < tokens.length; i++) {
-      buffer.push(tokens[i]);
+      // convert 8-digit to dashed format if needed
+      if (/^\d{8}$/.test(loc))
+        loc = `${loc.slice(0,2)}-${loc.slice(2,4)}-${loc.slice(4,6)}-${loc.slice(6)}`;
 
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(tokens[i])) {
-        rows.push(buffer.join(' '));
-        buffer = [];
+      const parts = loc.split('-').map(x => parseInt(x, 10) || 0);
+      while (parts.length < 4) parts.push(0);
+      return parts;
+    }
+
+    const A = normalize(a.location);
+    const B = normalize(b.location);
+
+    for (let i = 0; i < 4; i++) {
+      if (A[i] !== B[i]) return A[i] - B[i];
+    }
+    return 0;
+  }
+
+  /* parser for your format */
+  function parseNewFormat(rawText) {
+    const lines = rawText
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0);
+
+    let lastProduct = '';
+    let lastQty = 0;
+
+    const parsed = [];
+
+    lines.forEach(line => {
+      const t = line.split(/\s+/);
+      let i = 0;
+
+      if (/^\d{5}$/.test(t[i])) {
+        lastProduct = t[i++];
+        lastQty = Number(t[i++]);
       }
-    }
 
-    if (buffer.length) {
-      let temp = [];
-      buffer.forEach(tok => {
-        temp.push(tok);
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(tok)) {
-          rows.push(temp.join(' '));
-          temp = [];
-        }
+      if (t[i] !== 'IPN') return;
+
+      i++;
+      const palletNum = t[i++];
+      const boxes = Number(t[i++]);
+      const location = t[i++];
+      const date = t[i++];
+
+      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) return;
+
+      parsed.push({
+        productCode: lastProduct,
+        quantityNeeded: lastQty,
+        palletId: `IPN ${palletNum}`,
+        boxes,
+        location,
+        packedDate: date
       });
-    }
+    });
 
-    return rows.join('\n');
+    return parsed;
   }
 
   function copyToClipboard(text) {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text);
-      } else {
-        fallbackCopy(text);
-      }
+      } else fallbackCopy(text);
     } catch {
       fallbackCopy(text);
     }
@@ -243,7 +262,7 @@
     } else {
       orders[key].rawText += "\n" + text;
       document.getElementById(key).textContent =
-        `${orderNumber} - ${orderColor} updated.`;
+              `${orderNumber} - ${orderColor} updated.`;
     }
 
     orderForm.style.display = 'none';
@@ -255,63 +274,14 @@
     let usedPallets = new Set();
 
     Object.values(orders).forEach(order => {
-      let lastCode = '', lastQty = 0;
+
       const isEDI = order.orderNumber.startsWith('EDI');
       const maxAge = isEDI ? 7 : 30;
 
-      const lines = normalizeInput(order.rawText).split('\n');
-      const parsed = [];
-
-      lines.forEach(line => {
-        const p = line.split(/\s+/);
-        let i = 0;
-
-        if (/^\d{5}$/.test(p[i])) {
-          lastCode = p[i++];
-          lastQty = Number(p[i++]);
-        }
-
-        if (!p[i] || isNaN(p[i])) return;
-
-        const boxes = Number(p[i++]);
-        const palletId = p[i] + " " + p[i + 1];
-        i += 2;
-
-        if (usedPallets.has(palletId)) return;
-        usedPallets.add(palletId);
-
-        const loc = p[i++];
-        const date = p[i];
-
-        if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) return;
-
-        const age = daysOld(date);
-        const is71 = /^\d{8}$/.test(loc) && loc.startsWith('71');
-
-        const row = {
-          orderNumber: order.orderNumber,
-          orderColor: order.orderColor,
-          productCode: lastCode,
-          quantityNeeded: lastQty,
-          palletId,
-          boxes,
-          location: formatLocation(loc),
-          packedDate: date
-        };
-
-        if (!is71 && age > maxAge) {
-          rejected.push({
-            ...row,
-            orderNumber: "REJECTED",
-            orderColor: isEDI ? "OLD - EDI" : "OLD"
-          });
-        } else {
-          parsed.push(row);
-        }
-      });
+      const parsedRows = parseNewFormat(order.rawText);
 
       const byCode = {};
-      parsed.forEach(r => {
+      parsedRows.forEach(r => {
         if (!byCode[r.productCode]) byCode[r.productCode] = [];
         byCode[r.productCode].push(r);
       });
@@ -321,21 +291,65 @@
         let remaining = group[0].quantityNeeded;
 
         group.forEach(r => {
-          if (remaining <= 0) {
-            spare.push({ ...r, orderNumber:"SPARE", orderColor:"UNUSED", quantityNeeded:"" });
+          if (usedPallets.has(r.palletId)) return;
+          usedPallets.add(r.palletId);
+
+          const age = daysOld(r.packedDate);
+          const is71 = /^\d{8}$/.test(r.location) && r.location.startsWith('71');
+          const formattedLoc = formatLocation(r.location);
+
+          const base = {
+            orderNumber: order.orderNumber,
+            orderColor: order.orderColor,
+            productCode: r.productCode,
+            quantityNeeded: r.quantityNeeded,
+            palletId: r.palletId,
+            boxes: r.boxes,
+            location: formattedLoc,
+            packedDate: r.packedDate
+          };
+
+          if (!is71 && age > maxAge) {
+            rejected.push({
+              ...base,
+              orderNumber: "REJECTED",
+              orderColor: isEDI ? "OLD - EDI" : "OLD"
+            });
             return;
           }
+
+          if (remaining <= 0) {
+            spare.push({
+              ...base,
+              orderNumber: "SPARE",
+              orderColor: "UNUSED",
+              quantityNeeded: ""
+            });
+            return;
+          }
+
           if (r.boxes <= remaining) {
             remaining -= r.boxes;
-            main.push(r);
+            main.push(base);
           } else {
-            main.push({ ...r, boxes:`${r.boxes} need ${remaining}` });
-            spare.push({ ...r, boxes:r.boxes-remaining, orderNumber:"SPARE", orderColor:"UNUSED", quantityNeeded:"" });
+            main.push({ ...base, boxes: `${r.boxes} need ${remaining}` });
+            spare.push({
+              ...base,
+              boxes: r.boxes - remaining,
+              orderNumber: "SPARE",
+              orderColor: "UNUSED",
+              quantityNeeded: ""
+            });
             remaining = 0;
           }
         });
       });
     });
+
+    // 🔥 sort all three sections by location
+    main.sort(compareLocations);
+    rejected.sort(compareLocations);
+    spare.sort(compareLocations);
 
     if (!main.length && !rejected.length && !spare.length) {
       alert("No valid rows detected — please check pasted input format.");
@@ -343,7 +357,7 @@
     }
 
     const header =
-      "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date";
+            "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date";
 
     const rows = [header];
     main.forEach(r => rows.push(Object.values(r).join('\t')));
@@ -353,7 +367,7 @@
     spare.forEach(r => rows.push(Object.values(r).join('\t')));
 
     copyToClipboard(rows.join('\n'));
-    alert("Pick sheets copied to clipboard.");
+    alert("Pick sheets copied to clipboard (sorted by location).");
   };
 </script>
 
