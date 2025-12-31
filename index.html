@@ -4,91 +4,92 @@
   <meta charset="UTF-8">
   <title>Pick Sheet Generator</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f5f6f8;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 800px;
-      margin: 40px auto;
-      background: #ffffff;
-      padding: 30px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #333;
-    }
-    .button-row {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      margin-bottom: 25px;
-    }
-    button {
-      padding: 10px 18px;
-      border: none;
-      border-radius: 5px;
-      background-color: #007bff;
-      color: #fff;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    .order-form {
-      display: none;
-      margin-top: 20px;
-      border-top: 1px solid #ddd;
-      padding-top: 20px;
-    }
-    .form-group {
-      margin-bottom: 15px;
-    }
-    label {
-      display: block;
-      font-weight: bold;
-      margin-bottom: 5px;
-      color: #444;
-    }
-    input[type="text"],
-    textarea {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    textarea {
-      height: 180px;
-      resize: vertical;
-    }
-    .submit-button {
-      margin-top: 10px;
-      background-color: #28a745;
-    }
-    .submit-button:hover {
-      background-color: #1e7e34;
-    }
-    .order-list {
-      margin-top: 20px;
-      font-size: 14px;
-      color: #333;
-    }
-    .order-list div {
-      padding: 6px 0;
-    }
+      body {
+          font-family: Arial, sans-serif;
+          background-color: #f5f6f8;
+          margin: 0;
+          padding: 0;
+      }
+      .container {
+          max-width: 800px;
+          margin: 40px auto;
+          background: #ffffff;
+          padding: 30px;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      }
+      h1 {
+          text-align: center;
+          margin-bottom: 30px;
+          color: #333;
+      }
+      .button-row {
+          display: flex;
+          justify-content: center;
+          gap: 15px;
+          margin-bottom: 25px;
+      }
+      button {
+          padding: 10px 18px;
+          border: none;
+          border-radius: 5px;
+          background-color: #007bff;
+          color: #fff;
+          font-size: 14px;
+          cursor: pointer;
+      }
+      button:hover {
+          background-color: #0056b3;
+      }
+      .order-form {
+          display: none;
+          margin-top: 20px;
+          border-top: 1px solid #ddd;
+          padding-top: 20px;
+      }
+      .form-group {
+          margin-bottom: 15px;
+      }
+      label {
+          display: block;
+          font-weight: bold;
+          margin-bottom: 5px;
+          color: #444;
+      }
+      input[type="text"],
+      input[type="date"],
+      textarea {
+          width: 100%;
+          padding: 8px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 14px;
+      }
+      textarea {
+          height: 180px;
+          resize: vertical;
+      }
+      .submit-button {
+          margin-top: 10px;
+          background-color: #28a745;
+      }
+      .submit-button:hover {
+          background-color: #1e7e34;
+      }
+      .order-list {
+          margin-top: 20px;
+          font-size: 14px;
+          color: #333;
+      }
+      .order-list div {
+          padding: 6px 0;
+      }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.33)</h1>
+  <h1>Pick Sheet Generator (vers 0.40)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -105,6 +106,11 @@
     <div class="form-group">
       <label>Order Color</label>
       <input type="text" id="orderColor">
+    </div>
+
+    <div class="form-group">
+      <label>Oldest acceptable packed date</label>
+      <input type="date" id="oldestAcceptableDate">
     </div>
 
     <div class="form-group">
@@ -128,6 +134,7 @@
 
   const orderNumberInput = document.getElementById('orderNumber');
   const orderColorInput = document.getElementById('orderColor');
+  const oldestAcceptableDateInput = document.getElementById('oldestAcceptableDate');
   const textEntry = document.getElementById('textEntry');
 
   let orders = {};
@@ -153,35 +160,28 @@
     return raw;
   }
 
-  // 🔢 location sorter: numeric by each segment
   function compareLocations(a, b) {
     function normalize(loc) {
       if (loc === "NONE") return [999, 999, 999, 999];
-
-      // convert 8-digit to dashed format if needed
       if (/^\d{8}$/.test(loc))
         loc = `${loc.slice(0,2)}-${loc.slice(2,4)}-${loc.slice(4,6)}-${loc.slice(6)}`;
-
       const parts = loc.split('-').map(x => parseInt(x, 10) || 0);
       while (parts.length < 4) parts.push(0);
       return parts;
     }
-
     const A = normalize(a.location);
     const B = normalize(b.location);
-
     for (let i = 0; i < 4; i++) {
       if (A[i] !== B[i]) return A[i] - B[i];
     }
     return 0;
   }
 
-  /* parser for your format */
   function parseNewFormat(rawText) {
     const lines = rawText
-            .split('\n')
-            .map(l => l.trim())
-            .filter(l => l.length > 0);
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
 
     let lastProduct = '';
     let lastQty = 0;
@@ -244,25 +244,32 @@
   submitOrderBtn.onclick = () => {
     const orderNumber = orderNumberInput.value.trim();
     const orderColor = orderColorInput.value.trim();
+    const oldestDate = oldestAcceptableDateInput.value;
     const text = textEntry.value.trim();
 
-    if (!orderNumber || !orderColor || !text) {
-      alert("Please complete all fields.");
+    if (!orderNumber || !orderColor || !text || !oldestDate) {
+      alert("Please complete all fields including oldest acceptable date.");
       return;
     }
 
     const key = `${orderNumber}|${orderColor}`;
 
     if (!orders[key]) {
-      orders[key] = { orderNumber, orderColor, rawText: text };
+      orders[key] = {
+        orderNumber,
+        orderColor,
+        oldestDate,
+        rawText: text
+      };
       const div = document.createElement('div');
       div.id = key;
-      div.textContent = `${orderNumber} - ${orderColor} added.`;
+      div.textContent = `${orderNumber} - ${orderColor} added (oldest OK: ${oldestDate}).`;
       orderList.appendChild(div);
     } else {
       orders[key].rawText += "\n" + text;
+      orders[key].oldestDate = oldestDate;
       document.getElementById(key).textContent =
-              `${orderNumber} - ${orderColor} updated.`;
+        `${orderNumber} - ${orderColor} updated (oldest OK: ${oldestDate}).`;
     }
 
     orderForm.style.display = 'none';
@@ -270,14 +277,14 @@
   };
 
   exportBtn.onclick = () => {
-    let main = [], rejected = [], spare = [];
+    let main = [];
+    let rejected = [];
+
     let usedPallets = new Set();
 
     Object.values(orders).forEach(order => {
 
-      const isEDI = order.orderNumber.startsWith('EDI');
-      const maxAge = isEDI ? 7 : 30;
-
+      const cutoff = new Date(order.oldestDate);
       const parsedRows = parseNewFormat(order.rawText);
 
       const byCode = {};
@@ -287,87 +294,90 @@
       });
 
       Object.values(byCode).forEach(group => {
+
         group.sort((a,b)=>new Date(a.packedDate)-new Date(b.packedDate));
+
         let remaining = group[0].quantityNeeded;
 
         group.forEach(r => {
-          if (usedPallets.has(r.palletId)) return;
-          usedPallets.add(r.palletId);
 
-          const age = daysOld(r.packedDate);
-          const is71 = /^\d{8}$/.test(r.location) && r.location.startsWith('71');
+          const palletDate = new Date(r.packedDate);
           const formattedLoc = formatLocation(r.location);
-
           const base = {
             orderNumber: order.orderNumber,
             orderColor: order.orderColor,
             productCode: r.productCode,
-            quantityNeeded: r.quantityNeeded,
+            quantityNeeded: group[0].quantityNeeded,
             palletId: r.palletId,
             boxes: r.boxes,
             location: formattedLoc,
             packedDate: r.packedDate
           };
 
-          if (!is71 && age > maxAge) {
+          // already allocated elsewhere?
+          if (usedPallets.has(r.palletId)) return;
+
+          // reject if older than order cutoff date
+          if (palletDate < cutoff) {
             rejected.push({
               ...base,
               orderNumber: "REJECTED",
-              orderColor: isEDI ? "OLD - EDI" : "OLD"
+              orderColor: "TOO OLD"
             });
             return;
           }
 
-          if (remaining <= 0) {
-            spare.push({
-              ...base,
-              orderNumber: "SPARE",
-              orderColor: "UNUSED",
-              quantityNeeded: ""
-            });
-            return;
-          }
+          // allocate to order if still needed
+          if (remaining > 0) {
+            usedPallets.add(r.palletId);
 
-          if (r.boxes <= remaining) {
-            remaining -= r.boxes;
-            main.push(base);
+            if (r.boxes <= remaining) {
+              remaining -= r.boxes;
+              main.push(base);
+            } else {
+              main.push({ ...base, boxes: `${r.boxes} need ${remaining}` });
+
+              // leftovers are unused → rejected
+              rejected.push({
+                ...base,
+                boxes: r.boxes - remaining,
+                orderNumber: "REJECTED",
+                orderColor: "UNUSED"
+              });
+
+              remaining = 0;
+            }
+
           } else {
-            main.push({ ...base, boxes: `${r.boxes} need ${remaining}` });
-            spare.push({
+            // not needed anywhere → rejected
+            rejected.push({
               ...base,
-              boxes: r.boxes - remaining,
-              orderNumber: "SPARE",
-              orderColor: "UNUSED",
-              quantityNeeded: ""
+              orderNumber: "REJECTED",
+              orderColor: "UNUSED"
             });
-            remaining = 0;
           }
         });
       });
     });
 
-    // 🔥 sort all three sections by location
     main.sort(compareLocations);
     rejected.sort(compareLocations);
-    spare.sort(compareLocations);
 
-    if (!main.length && !rejected.length && !spare.length) {
+    if (!main.length && !rejected.length) {
       alert("No valid rows detected — please check pasted input format.");
       return;
     }
 
     const header =
-            "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date";
+      "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date";
 
     const rows = [header];
     main.forEach(r => rows.push(Object.values(r).join('\t')));
     if (rejected.length) rows.push('');
     rejected.forEach(r => rows.push(Object.values(r).join('\t')));
-    if (spare.length) rows.push('');
-    spare.forEach(r => rows.push(Object.values(r).join('\t')));
 
     copyToClipboard(rows.join('\n'));
-    alert("Pick sheets copied to clipboard (sorted by location).");
+    alert("Pick sheets copied to clipboard with per-order cutoff dates.");
   };
 </script>
 
