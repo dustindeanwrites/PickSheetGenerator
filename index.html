@@ -4,92 +4,92 @@
   <meta charset="UTF-8">
   <title>Pick Sheet Generator</title>
   <style>
-      body {
-          font-family: Arial, sans-serif;
-          background-color: #f5f6f8;
-          margin: 0;
-          padding: 0;
-      }
-      .container {
-          max-width: 800px;
-          margin: 40px auto;
-          background: #ffffff;
-          padding: 30px;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-      }
-      h1 {
-          text-align: center;
-          margin-bottom: 30px;
-          color: #333;
-      }
-      .button-row {
-          display: flex;
-          justify-content: center;
-          gap: 15px;
-          margin-bottom: 25px;
-      }
-      button {
-          padding: 10px 18px;
-          border: none;
-          border-radius: 5px;
-          background-color: #007bff;
-          color: #fff;
-          font-size: 14px;
-          cursor: pointer;
-      }
-      button:hover {
-          background-color: #0056b3;
-      }
-      .order-form {
-          display: none;
-          margin-top: 20px;
-          border-top: 1px solid #ddd;
-          padding-top: 20px;
-      }
-      .form-group {
-          margin-bottom: 15px;
-      }
-      label {
-          display: block;
-          font-weight: bold;
-          margin-bottom: 5px;
-          color: #444;
-      }
-      input[type="text"],
-      input[type="date"],
-      textarea {
-          width: 100%;
-          padding: 8px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          font-size: 14px;
-      }
-      textarea {
-          height: 180px;
-          resize: vertical;
-      }
-      .submit-button {
-          margin-top: 10px;
-          background-color: #28a745;
-      }
-      .submit-button:hover {
-          background-color: #1e7e34;
-      }
-      .order-list {
-          margin-top: 20px;
-          font-size: 14px;
-          color: #333;
-      }
-      .order-list div {
-          padding: 6px 0;
-      }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f6f8;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+    .button-row {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .order-form {
+      display: none;
+      margin-top: 20px;
+      border-top: 1px solid #ddd;
+      padding-top: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #444;
+    }
+    input[type="text"],
+    input[type="date"],
+    textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    textarea {
+      height: 180px;
+      resize: vertical;
+    }
+    .submit-button {
+      margin-top: 10px;
+      background-color: #28a745;
+    }
+    .submit-button:hover {
+      background-color: #1e7e34;
+    }
+    .order-list {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #333;
+    }
+    .order-list div {
+      padding: 6px 0;
+    }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.40)</h1>
+  <h1>Pick Sheet Generator (vers 0.41)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -147,11 +147,6 @@
     orders = {};
   };
 
-  function daysOld(dateString) {
-    const [m, d, y] = dateString.split('/').map(Number);
-    return (new Date() - new Date(y, m - 1, d)) / 86400000;
-  }
-
   function formatLocation(raw) {
     if (raw === "60001000") return "NONE";
     if (/^\d{8}$/.test(raw)) {
@@ -179,9 +174,9 @@
 
   function parseNewFormat(rawText) {
     const lines = rawText
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0);
 
     let lastProduct = '';
     let lastQty = 0;
@@ -191,6 +186,8 @@
     lines.forEach(line => {
       const t = line.split(/\s+/);
       let i = 0;
+
+      const isMixed = line.toLowerCase().includes("mixed");
 
       if (/^\d{5}$/.test(t[i])) {
         lastProduct = t[i++];
@@ -213,7 +210,8 @@
         palletId: `IPN ${palletNum}`,
         boxes,
         location,
-        packedDate: date
+        packedDate: date,
+        mixed: isMixed ? "mixed" : ""
       });
     });
 
@@ -269,7 +267,7 @@
       orders[key].rawText += "\n" + text;
       orders[key].oldestDate = oldestDate;
       document.getElementById(key).textContent =
-        `${orderNumber} - ${orderColor} updated (oldest OK: ${oldestDate}).`;
+              `${orderNumber} - ${orderColor} updated (oldest OK: ${oldestDate}).`;
     }
 
     orderForm.style.display = 'none';
@@ -303,6 +301,7 @@
 
           const palletDate = new Date(r.packedDate);
           const formattedLoc = formatLocation(r.location);
+
           const base = {
             orderNumber: order.orderNumber,
             orderColor: order.orderColor,
@@ -311,13 +310,12 @@
             palletId: r.palletId,
             boxes: r.boxes,
             location: formattedLoc,
-            packedDate: r.packedDate
+            packedDate: r.packedDate,
+            mixed: r.mixed
           };
 
-          // already allocated elsewhere?
           if (usedPallets.has(r.palletId)) return;
 
-          // reject if older than order cutoff date
           if (palletDate < cutoff) {
             rejected.push({
               ...base,
@@ -327,7 +325,6 @@
             return;
           }
 
-          // allocate to order if still needed
           if (remaining > 0) {
             usedPallets.add(r.palletId);
 
@@ -337,7 +334,6 @@
             } else {
               main.push({ ...base, boxes: `${r.boxes} need ${remaining}` });
 
-              // leftovers are unused → rejected
               rejected.push({
                 ...base,
                 boxes: r.boxes - remaining,
@@ -349,7 +345,6 @@
             }
 
           } else {
-            // not needed anywhere → rejected
             rejected.push({
               ...base,
               orderNumber: "REJECTED",
@@ -369,12 +364,35 @@
     }
 
     const header =
-      "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date";
+            "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date\tMixed";
 
     const rows = [header];
-    main.forEach(r => rows.push(Object.values(r).join('\t')));
+
+    main.forEach(r => rows.push([
+      r.orderNumber,
+      r.orderColor,
+      r.productCode,
+      r.quantityNeeded,
+      r.palletId,
+      r.boxes,
+      r.location,
+      r.packedDate,
+      r.mixed
+    ].join('\t')));
+
     if (rejected.length) rows.push('');
-    rejected.forEach(r => rows.push(Object.values(r).join('\t')));
+
+    rejected.forEach(r => rows.push([
+      r.orderNumber,
+      r.orderColor,
+      r.productCode,
+      r.quantityNeeded,
+      r.palletId,
+      r.boxes,
+      r.location,
+      r.packedDate,
+      r.mixed
+    ].join('\t')));
 
     copyToClipboard(rows.join('\n'));
     alert("Pick sheets copied to clipboard with per-order cutoff dates.");
