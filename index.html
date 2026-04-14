@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>Pick Sheet Generator</title>
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -56,40 +60,21 @@
       margin-bottom: 5px;
       color: #444;
     }
-    input[type="text"],
-    input[type="date"],
-    textarea {
+    input, textarea {
       width: 100%;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
-      font-size: 14px;
     }
     textarea {
       height: 180px;
-      resize: vertical;
-    }
-    .submit-button {
-      margin-top: 10px;
-      background-color: #28a745;
-    }
-    .submit-button:hover {
-      background-color: #1e7e34;
-    }
-    .order-list {
-      margin-top: 20px;
-      font-size: 14px;
-      color: #333;
-    }
-    .order-list div {
-      padding: 6px 0;
     }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.41)</h1>
+  <h1>Pick Sheet Generator (vers 0.44)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -118,34 +103,41 @@
       <textarea id="textEntry"></textarea>
     </div>
 
-    <button class="submit-button" id="submitOrderBtn">Submit Order</button>
+    <button id="submitOrderBtn">Submit Order</button>
   </div>
 
-  <div class="order-list" id="orderList"></div>
+  <div id="orderList"></div>
 </div>
 
 <script>
-  const addOrderBtn = document.getElementById('addOrderBtn');
-  const submitOrderBtn = document.getElementById('submitOrderBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const exportBtn = document.getElementById('exportBtn');
-  const orderForm = document.getElementById('orderForm');
-  const orderList = document.getElementById('orderList');
+  const excludedLocations = new Set([
+    "RED","BLUE","PURPLE","PINK","GREEN","WHITE","GRAY","BROWN","ORANGE","YELLOW",
+    "NTR","NTB","MIDDLE","M","RED2","RED3","OFFAL","GREEN2","CR","GREEN3",
+    "DOOR1","DOOR2","DOOR3","DOOR4","DOOR5","DOOR6","DOOR7","DOOR8"
+  ]);
 
-  const orderNumberInput = document.getElementById('orderNumber');
-  const orderColorInput = document.getElementById('orderColor');
-  const oldestAcceptableDateInput = document.getElementById('oldestAcceptableDate');
-  const textEntry = document.getElementById('textEntry');
+  function getColorHex(color) {
+    const map = {
+      RED: "FF9999",
+      BLUE: "9999FF",
+      GREEN: "99FF99",
+      YELLOW: "FFFF99",
+      ORANGE: "FFCC99",
+      PURPLE: "CC99FF",
+      PINK: "FFB6C1",
+      GRAY: "DDDDDD",
+      BROWN: "C4A484",
+      WHITE: "FFFFFF"
+    };
+    return map[color?.toUpperCase()] || "FFFFFF";
+  }
 
-  let orders = {};
-
-  addOrderBtn.onclick = () => orderForm.style.display = 'block';
-
-  resetBtn.onclick = () => {
-    orderForm.style.display = 'none';
-    orderList.innerHTML = '';
-    orders = {};
-  };
+  function compareOrders(a, b) {
+    if (a.orderNumber !== b.orderNumber) {
+      return a.orderNumber.localeCompare(b.orderNumber, undefined, { numeric: true });
+    }
+    return a.orderColor.localeCompare(b.orderColor);
+  }
 
   function formatLocation(raw) {
     if (raw === "60001000") return "NONE";
@@ -155,247 +147,156 @@
     return raw;
   }
 
-  function compareLocations(a, b) {
-    function normalize(loc) {
-      if (loc === "NONE") return [999, 999, 999, 999];
-      if (/^\d{8}$/.test(loc))
-        loc = `${loc.slice(0,2)}-${loc.slice(2,4)}-${loc.slice(4,6)}-${loc.slice(6)}`;
-      const parts = loc.split('-').map(x => parseInt(x, 10) || 0);
-      while (parts.length < 4) parts.push(0);
-      return parts;
-    }
-    const A = normalize(a.location);
-    const B = normalize(b.location);
-    for (let i = 0; i < 4; i++) {
-      if (A[i] !== B[i]) return A[i] - B[i];
-    }
-    return 0;
-  }
-
   function parseNewFormat(rawText) {
-    const lines = rawText
-            .split('\n')
-            .map(l => l.trim())
-            .filter(l => l.length > 0);
-
-    let lastProduct = '';
-    let lastQty = 0;
-
-    const parsed = [];
+    const lines = rawText.split('\n').map(l => l.trim()).filter(l => l);
+    let lastProduct='', lastQty=0, parsed=[];
 
     lines.forEach(line => {
-      const t = line.split(/\s+/);
-      let i = 0;
-
-      const isMixed = line.toLowerCase().includes("mixed");
+      const t=line.split(/\s+/);
+      let i=0;
+      const isMixed=line.toLowerCase().includes("mixed");
 
       if (/^\d{5}$/.test(t[i])) {
-        lastProduct = t[i++];
-        lastQty = Number(t[i++]);
+        lastProduct=t[i++];
+        lastQty=Number(t[i++]);
       }
 
-      if (t[i] !== 'IPN') return;
+      if (t[i]!=='IPN') return;
 
       i++;
-      const palletNum = t[i++];
-      const boxes = Number(t[i++]);
-      const location = t[i++];
-      const date = t[i++];
+      const palletNum=t[i++], boxes=Number(t[i++]), location=t[i++], date=t[i++];
 
       if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) return;
 
       parsed.push({
-        productCode: lastProduct,
-        quantityNeeded: lastQty,
-        palletId: `IPN ${palletNum}`,
+        productCode:lastProduct,
+        quantityNeeded:lastQty,
+        palletId:`IPN ${palletNum}`,
         boxes,
         location,
-        packedDate: date,
-        mixed: isMixed ? "mixed" : ""
+        packedDate:date,
+        mixed:isMixed?"mixed":""
       });
     });
 
     return parsed;
   }
 
-  function copyToClipboard(text) {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text);
-      } else fallbackCopy(text);
-    } catch {
-      fallbackCopy(text);
-    }
-  }
+  let orders={};
 
-  function fallbackCopy(text) {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-  }
+  document.getElementById('addOrderBtn').onclick=()=>document.getElementById('orderForm').style.display='block';
 
-  submitOrderBtn.onclick = () => {
-    const orderNumber = orderNumberInput.value.trim();
-    const orderColor = orderColorInput.value.trim();
-    const oldestDate = oldestAcceptableDateInput.value;
-    const text = textEntry.value.trim();
-
-    if (!orderNumber || !orderColor || !text || !oldestDate) {
-      alert("Please complete all fields including oldest acceptable date.");
-      return;
-    }
-
-    const key = `${orderNumber}|${orderColor}`;
-
-    if (!orders[key]) {
-      orders[key] = {
-        orderNumber,
-        orderColor,
-        oldestDate,
-        rawText: text
-      };
-      const div = document.createElement('div');
-      div.id = key;
-      div.textContent = `${orderNumber} - ${orderColor} added (oldest OK: ${oldestDate}).`;
-      orderList.appendChild(div);
-    } else {
-      orders[key].rawText += "\n" + text;
-      orders[key].oldestDate = oldestDate;
-      document.getElementById(key).textContent =
-              `${orderNumber} - ${orderColor} updated (oldest OK: ${oldestDate}).`;
-    }
-
-    orderForm.style.display = 'none';
-    textEntry.value = '';
+  document.getElementById('resetBtn').onclick=()=>{
+    orders={};
+    document.getElementById('orderList').innerHTML='';
   };
 
-  exportBtn.onclick = () => {
-    let main = [];
-    let rejected = [];
+  document.getElementById('submitOrderBtn').onclick=()=>{
+    const orderNumber=document.getElementById('orderNumber').value.trim();
+    const orderColor=document.getElementById('orderColor').value.trim();
+    const oldestDate=document.getElementById('oldestAcceptableDate').value;
+    const text=document.getElementById('textEntry').value.trim();
 
-    let usedPallets = new Set();
+    if (!orderNumber||!orderColor||!oldestDate||!text) return alert("Fill all fields");
 
-    Object.values(orders).forEach(order => {
+    const key=`${orderNumber}|${orderColor}`;
 
-      const cutoff = new Date(order.oldestDate);
-      const parsedRows = parseNewFormat(order.rawText);
+    orders[key]={orderNumber,orderColor,oldestDate,rawText:text};
 
-      const byCode = {};
-      parsedRows.forEach(r => {
-        if (!byCode[r.productCode]) byCode[r.productCode] = [];
+    document.getElementById('orderList').innerHTML+=`<div>${orderNumber} - ${orderColor}</div>`;
+  };
+
+  document.getElementById('exportBtn').onclick=()=>{
+
+    let main=[], rejected=[], alreadyPicked=[];
+    let usedPallets=new Set();
+
+    Object.values(orders).forEach(order=>{
+      const cutoff=new Date(order.oldestDate);
+      const parsed=parseNewFormat(order.rawText);
+
+      const byCode={};
+      parsed.forEach(r=>{
+        if(!byCode[r.productCode]) byCode[r.productCode]=[];
         byCode[r.productCode].push(r);
       });
 
-      Object.values(byCode).forEach(group => {
-
+      Object.values(byCode).forEach(group=>{
         group.sort((a,b)=>new Date(a.packedDate)-new Date(b.packedDate));
+        let remaining=group[0].quantityNeeded;
 
-        let remaining = group[0].quantityNeeded;
+        group.forEach(r=>{
+          const loc=formatLocation(r.location);
+          const base={...r,orderNumber:order.orderNumber,orderColor:order.orderColor,location:loc};
 
-        group.forEach(r => {
-
-          const palletDate = new Date(r.packedDate);
-          const formattedLoc = formatLocation(r.location);
-
-          const base = {
-            orderNumber: order.orderNumber,
-            orderColor: order.orderColor,
-            productCode: r.productCode,
-            quantityNeeded: group[0].quantityNeeded,
-            palletId: r.palletId,
-            boxes: r.boxes,
-            location: formattedLoc,
-            packedDate: r.packedDate,
-            mixed: r.mixed
-          };
-
-          if (usedPallets.has(r.palletId)) return;
-
-          if (palletDate < cutoff) {
-            rejected.push({
-              ...base,
-              orderNumber: "REJECTED",
-              orderColor: "TOO OLD"
-            });
+          if(excludedLocations.has(loc.toUpperCase())){
+            alreadyPicked.push({...base,orderNumber:"ALREADY PICKED"});
             return;
           }
 
-          if (remaining > 0) {
+          if(usedPallets.has(r.palletId)) return;
+
+          if(new Date(r.packedDate)<cutoff){
+            rejected.push({...base,orderNumber:"REJECTED",orderColor:"TOO OLD"});
+            return;
+          }
+
+          if(remaining>0){
             usedPallets.add(r.palletId);
 
-            if (r.boxes <= remaining) {
-              remaining -= r.boxes;
+            if(r.boxes<=remaining){
+              remaining-=r.boxes;
               main.push(base);
-            } else {
-              main.push({ ...base, boxes: `${r.boxes} need ${remaining}` });
-
-              rejected.push({
-                ...base,
-                boxes: r.boxes - remaining,
-                orderNumber: "REJECTED",
-                orderColor: "UNUSED"
-              });
-
-              remaining = 0;
+            }else{
+              main.push({...base,boxes:`${r.boxes} need ${remaining}`});
+              rejected.push({...base,orderNumber:"REJECTED",orderColor:"UNUSED"});
+              remaining=0;
             }
-
           } else {
-            rejected.push({
-              ...base,
-              orderNumber: "REJECTED",
-              orderColor: "UNUSED"
-            });
+            rejected.push({...base,orderNumber:"REJECTED",orderColor:"UNUSED"});
           }
         });
       });
     });
 
-    main.sort(compareLocations);
-    rejected.sort(compareLocations);
+    main.sort(compareOrders);
+    rejected.sort(compareOrders);
+    alreadyPicked.sort(compareOrders);
 
-    if (!main.length && !rejected.length) {
-      alert("No valid rows detected — please check pasted input format.");
-      return;
+    const header=["Order Number","Order Color","Product Code","Qty Needed","Pallet","Boxes","Location","Date","Mixed"];
+    const data=[header];
+
+    function pushRows(arr){
+      arr.forEach(r=>{
+        data.push([
+          r.orderNumber,r.orderColor,r.productCode,r.quantityNeeded,
+          r.palletId,r.boxes,r.location,r.packedDate,r.mixed
+        ]);
+      });
     }
 
-    const header =
-            "Order Number\tOrder Color\tProduct Code\tQuantity Needed\tPallet ID\tBoxes on Pallet\tLocation\tPacked Date\tMixed";
+    pushRows(main);
+    data.push([]);
+    pushRows(rejected);
+    data.push([]);
+    data.push(["ALREADY PICKED"]);
+    pushRows(alreadyPicked);
 
-    const rows = [header];
+    const ws=XLSX.utils.aoa_to_sheet(data);
 
-    main.forEach(r => rows.push([
-      r.orderNumber,
-      r.orderColor,
-      r.productCode,
-      r.quantityNeeded,
-      r.palletId,
-      r.boxes,
-      r.location,
-      r.packedDate,
-      r.mixed
-    ].join('\t')));
+    for(let i=1;i<data.length;i++){
+      const color=getColorHex(data[i][1]);
+      for(let j=0;j<header.length;j++){
+        const ref=XLSX.utils.encode_cell({r:i,c:j});
+        if(ws[ref]){
+          ws[ref].s={fill:{fgColor:{rgb:color}}};
+        }
+      }
+    }
 
-    if (rejected.length) rows.push('');
-
-    rejected.forEach(r => rows.push([
-      r.orderNumber,
-      r.orderColor,
-      r.productCode,
-      r.quantityNeeded,
-      r.palletId,
-      r.boxes,
-      r.location,
-      r.packedDate,
-      r.mixed
-    ].join('\t')));
-
-    copyToClipboard(rows.join('\n'));
-    alert("Pick sheets copied to clipboard with per-order cutoff dates.");
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"PickSheet");
+    XLSX.writeFile(wb,"PickSheet.xlsx");
   };
 </script>
 
