@@ -89,7 +89,7 @@
 <body>
 
 <div class="container">
-  <h1>Pick Sheet Generator (vers 0.42)</h1>
+  <h1>Pick Sheet Generator (vers 0.41.2)</h1>
 
   <div class="button-row">
     <button id="addOrderBtn">Add Order</button>
@@ -139,13 +139,6 @@
 
   let orders = {};
 
-  // NEW: excluded locations
-  const excludedLocations = new Set([
-    "RED","BLUE","PURPLE","PINK","GREEN","WHITE","GRAY","BROWN","ORANGE","YELLOW",
-    "NTR","NTB","MIDDLE","M","RED2","RED3","OFFAL","GREEN2","CR","GREEN3",
-    "DOOR1","DOOR2","DOOR3","DOOR4","DOOR5","DOOR6","DOOR7","DOOR8"
-  ]);
-
   addOrderBtn.onclick = () => orderForm.style.display = 'block';
 
   resetBtn.onclick = () => {
@@ -162,11 +155,21 @@
     return raw;
   }
 
-  function compareOrders(a, b) {
-    if (a.orderNumber !== b.orderNumber) {
-      return a.orderNumber.localeCompare(b.orderNumber, undefined, { numeric: true });
+  function compareLocations(a, b) {
+    function normalize(loc) {
+      if (loc === "NONE") return [999, 999, 999, 999];
+      if (/^\d{8}$/.test(loc))
+        loc = `${loc.slice(0,2)}-${loc.slice(2,4)}-${loc.slice(4,6)}-${loc.slice(6)}`;
+      const parts = loc.split('-').map(x => parseInt(x, 10) || 0);
+      while (parts.length < 4) parts.push(0);
+      return parts;
     }
-    return a.orderColor.localeCompare(b.orderColor);
+    const A = normalize(a.location);
+    const B = normalize(b.location);
+    for (let i = 0; i < 4; i++) {
+      if (A[i] !== B[i]) return A[i] - B[i];
+    }
+    return 0;
   }
 
   function parseNewFormat(rawText) {
@@ -274,7 +277,6 @@
   exportBtn.onclick = () => {
     let main = [];
     let rejected = [];
-    let alreadyPicked = [];
 
     let usedPallets = new Set();
 
@@ -311,17 +313,6 @@
             packedDate: r.packedDate,
             mixed: r.mixed
           };
-
-          const locUpper = formattedLoc.toUpperCase();
-
-          if (excludedLocations.has(locUpper)) {
-            alreadyPicked.push({
-              ...base,
-              orderNumber: "ALREADY PICKED",
-              orderColor: formattedLoc
-            });
-            return;
-          }
 
           if (usedPallets.has(r.palletId)) return;
 
@@ -364,11 +355,10 @@
       });
     });
 
-    main.sort(compareOrders);
-    rejected.sort(compareOrders);
-    alreadyPicked.sort(compareOrders);
+    main.sort(compareLocations);
+    rejected.sort(compareLocations);
 
-    if (!main.length && !rejected.length && !alreadyPicked.length) {
+    if (!main.length && !rejected.length) {
       alert("No valid rows detected — please check pasted input format.");
       return;
     }
@@ -393,32 +383,6 @@
     if (rejected.length) rows.push('');
 
     rejected.forEach(r => rows.push([
-      r.orderNumber,
-      r.orderColor,
-      r.productCode,
-      r.quantityNeeded,
-      r.palletId,
-      r.boxes,
-      r.location,
-      r.packedDate,
-      r.mixed
-    ].join('\t')));
-
-    if (alreadyPicked.length) rows.push('');
-
-    alreadyPicked.unshift({
-      orderNumber: "ALREADY PICKED",
-      orderColor: "",
-      productCode: "",
-      quantityNeeded: "",
-      palletId: "",
-      boxes: "",
-      location: "",
-      packedDate: "",
-      mixed: ""
-    });
-
-    alreadyPicked.forEach(r => rows.push([
       r.orderNumber,
       r.orderColor,
       r.productCode,
